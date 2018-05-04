@@ -37,6 +37,10 @@ public class TopologyConfig {
     private Integer keepRemovedIslTimeout;
     private final float discoverySpeakerFailureTimeout;
     private final float discoveryDumpRequestTimeout;
+
+    private Integer flowPingInterval;
+    private Integer flowPingWaitLimit;
+
     private String filterDirectory;
     private Level loggerLevel;
     private String loggerWatermark;
@@ -51,6 +55,7 @@ public class TopologyConfig {
 
     private String kafkaCtrlTopic;
     private String kafkaFlowTopic;
+    private String kafkaFlowSyncTopic;
     private String kafkaHealthCheckTopic;
     private String kafkaNorthboundTopic;
     private String kafkaOtsdbTopic;
@@ -95,11 +100,16 @@ public class TopologyConfig {
         discoveryTimeout = config.getInteger("discovery.timeout");
         discoveryLimit = config.getInteger("discovery.limit");
         discoverySpeakerFailureTimeout = config.getFloat("discovery.speaker-failure-timeout");
+        discoveryDumpRequestTimeout = config.getFloat("discovery.dump-request-timeout-seconds");
+
+        flowPingInterval = config.getInteger("flow.ping.interval");
+        flowPingWaitLimit = config.getInteger("flow.ping.wait-limit");
+
         keepRemovedIslTimeout = config.getInteger("discovery.keep.removed.isl");
+
         filterDirectory = config.getString("filter.directory");
         loggerLevel = Level.valueOf(config.getString("logger.level"));
         loggerWatermark = config.getString("logger.watermark");
-        discoveryDumpRequestTimeout = config.getFloat("discovery.dump-request-timeout-seconds");
 
         zookeeperHosts = config.getString("zookeeper.hosts");
         zookeeperSessionTimeout = (int) (config.getFloat("zookeeper.session.timeout") * 1000);
@@ -110,6 +120,7 @@ public class TopologyConfig {
 
         kafkaCtrlTopic = config.getString("kafka.topic.ctrl");
         kafkaFlowTopic = config.getString("kafka.topic.flow");
+        kafkaFlowSyncTopic = config.getString("kafka.topic.flow.sync");
         kafkaHealthCheckTopic = config.getString("kafka.topic.health.check");
         kafkaNorthboundTopic = config.getString("kafka.topic.northbound");
         kafkaOtsdbTopic = config.getString("kafka.topic.opentsdb");
