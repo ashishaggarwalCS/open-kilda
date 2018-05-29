@@ -799,7 +799,7 @@ public class FlowServiceImpl implements FlowService {
         FlowVerificationResponse response = (FlowVerificationResponse) validateInfoMessage(
                 request, message, correlationId);
 
-        return Converter.buildVerificationOutput(response);
+        return FlowPayloadToFlowConverter.buildVerificationOutput(response);
     }
 
     /**
