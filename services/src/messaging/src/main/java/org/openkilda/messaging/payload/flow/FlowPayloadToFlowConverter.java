@@ -106,6 +106,12 @@ public final class FlowPayloadToFlowConverter {
         return new FlowReroutePayload(flowId, path, rerouted);
     }
 
+    /**
+     * Builds {@link VerificationOutput} instance by {@link FlowVerificationResponse} instance.
+     *
+     * @param response {@link FlowVerificationResponse} instance
+     * @return {@link VerificationOutput} instance
+     */
     public static VerificationOutput buildVerificationOutput(FlowVerificationResponse response) {
         UniFlowVerificationResponse forward = response.getForward();
         UniFlowVerificationOutput.UniFlowVerificationOutputBuilder forwardBuilder = UniFlowVerificationOutput.builder()
