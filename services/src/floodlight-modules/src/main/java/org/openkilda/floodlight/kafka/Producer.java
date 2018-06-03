@@ -20,7 +20,7 @@ public class Producer {
     private Map<String, KafkaTopicOrderDescriptor> guaranteedOrder = new HashMap<>();
 
     public Producer(Context context) {
-        producer = new KafkaProducer<>(context.getKafkaConfig());
+        producer = new KafkaProducer<>(context.getKafkaProducerProperties());
     }
 
     public void enableGuaranteedOrder(String topic) {
