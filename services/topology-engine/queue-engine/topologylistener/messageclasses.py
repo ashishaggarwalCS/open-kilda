@@ -18,7 +18,6 @@ import json
 import logging
 import threading
 
-from py2neo import Node
 from topologylistener import model
 
 from topologylistener import config
@@ -125,17 +124,22 @@ def read_config():
 read_config()
 
 
-class MessageItem(object):
+class MessageItem(model.JsonSerializable):
     def __init__(self, message):
         self._raw_message = message
 
-        self.type = kwargs.get("clazz")
-        self.timestamp = model.TimeProperty.new_from_java_timestamp(
-                kwargs.get("timestamp"))
-        self.payload = kwargs.get("payload", {})
-        self.destination = kwargs.get("destination","")
-        self.correlation_id = kwargs.get("correlation_id", "admin-request")
-        self.reply_to = kwargs.get("reply_to", "")
+        self.type = message.get("clazz")
+        self.payload = message.get("payload", {})
+        self.destination = message.get("destination","")
+        self.correlation_id = message.get("correlation_id", "admin-request")
+        self.reply_to = message.get("reply_to", "")
+
+        try:
+            timestamp = message['timestamp']
+            timestamp = model.TimeProperty.new_from_java_timestamp(timestamp)
+        except KeyError:
+            timestamp = model.TimeProperty.now()
+        self.timestamp = timestamp
 
     def to_json(self):
         return json.dumps(

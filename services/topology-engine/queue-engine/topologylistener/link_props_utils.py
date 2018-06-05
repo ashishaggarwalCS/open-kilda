@@ -23,33 +23,18 @@ logger = logging.getLogger(__name__)
 
 
 def set_props(tx, subject, props):
-    match = _make_match(subject)
-    q = textwrap.dedent("""
-        MATCH (target:link_props {
-            src_switch: $src_switch,
-            src_port: $src_port,
-            dst_switch: $dst_switch,
-            dst_port: $dst_port})
-        RETURN target""")
-
-    logger.debug('link_props lookup query:\n%s', q)
-    cursor = tx.run(q, match)
-
-    try:
-        target = db.fetch_one(cursor)['target']
-    except exc.DBEmptyResponse:
-        raise exc.DBRecordNotFound(q, match)
-
-    origin, update = db.locate_changes(target, props)
+    db_subject = fetch(tx, subject)
+    origin, update = db.locate_changes(db_subject, props)
     if update:
         q = textwrap.dedent("""
         MATCH (target:link_props) 
         WHERE id(target)=$target_id
         """) + db.format_set_fields(
                 db.escape_fields(update), field_prefix='target.')
+        p = {'target_id': db.neo_id(db_subject)}
 
-        logger.debug('Push link_props properties: %r', update)
-        tx.run(q, {'target_id': db.neo_id(target)})
+        db.log_query('propagete link props to ISL', q, p)
+        tx.run(q, p)
 
         push_props_to_isl(tx, subject, *update.keys())
 
@@ -80,8 +65,32 @@ def push_props_to_isl(tx, isl, *fields):
             db.escape_fields(copy_fields, raw_values=True),
             field_prefix='target.')
     p = _make_match(isl)
-    db.log_query()
+    db.log_query('link props to ISL', q, p)
     tx.run(q, p)
+
+
+# low level DB operations
+
+
+def fetch(tx, subject):
+    p = _make_match(subject)
+    q = textwrap.dedent("""
+        MATCH (target:link_props {
+            src_switch: $src_switch,
+            src_port: $src_port,
+            dst_switch: $dst_switch,
+            dst_port: $dst_port})
+        RETURN target""")
+
+    db.log_query('link props update', q, p)
+    cursor = tx.run(q, p)
+
+    try:
+        db_object = db.fetch_one(cursor)['target']
+    except exc.DBEmptyResponse:
+        raise exc.DBRecordNotFound(q, p)
+
+    return db_object
 
 
 def _make_match(isl):

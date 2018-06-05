@@ -165,6 +165,65 @@ class AbstractLink(Abstract):
         return self.source, self.dest
 
 
+class LinkProps(AbstractLink):
+    isl_protected_fields = frozenset((
+        'latency', 'speed', 'available_bandwidth', 'status'))
+    props_converters = {
+        'cost': convert_integer}
+
+    props = Default(dict, produce=True)
+
+    @classmethod
+    def new_from_java(cls, data):
+        data = data.copy()
+        source = NetworkEndpoint.new_from_java(data.pop('source'))
+        dest = NetworkEndpoint.new_from_java(data.pop('dest'))
+        props = data.pop('props', dict()).copy()
+        return cls(source, dest, props=props, **data)
+
+    @classmethod
+    def new_from_db(cls, data):
+        data = data.copy()
+        endpoints = []
+        for prefix in ('src_{}', 'dst_'):
+            dpid = data[prefix + 'switch']
+            port = data[prefix + 'port']
+            endpoints.append(NetworkEndpoint(dpid, port))
+        source, dest = endpoints
+        props = data.get('props', dict()).copy()
+        return cls(source, dest, props=props)
+
+    def __init__(self, source, dest, **fields):
+        super(LinkProps, self).__init__(**fields)
+        self.source = source
+        self.dest = dest
+
+        self._filter_props()
+        self._decode_props()
+
+    def _filter_props(self):
+        filtered = set()
+        for field in self.isl_protected_fields:
+            try:
+                del self.props[field]
+                filtered.add(field)
+            except KeyError:
+                pass
+        if filtered:
+            logger.warning(
+                'Filter out %s fields from object %s',
+                ', '.join(repr(x) for x in sorted(filtered)),
+                self)
+
+    def _decode_props(self):
+        for field, converter in self.props_converters.items():
+            try:
+                value = self.props[field]
+            except KeyError:
+                continue
+            self.props[field] = converter(value)
+
+
 class InterSwitchLink(
         collections.namedtuple(
             'InterSwitchLink', ('source', 'dest', 'state'))):
@@ -253,65 +312,6 @@ class TimeProperty(object):
         return seconds * 1000 + from_epoch.microseconds // 1000
 
 
-class LinkProps(AbstractLink):
-    isl_protected_fields = frozenset((
-        'latency', 'speed', 'available_bandwidth', 'status'))
-    props_converters = {
-        'cost': convert_integer}
-
-    props = Default(dict, produce=True)
-
-    @classmethod
-    def new_from_java(cls, data):
-        data = data.copy()
-        source = NetworkEndpoint.new_from_java(data.pop('source'))
-        dest = NetworkEndpoint.new_from_java(data.pop('dest'))
-        props = data.pop('props', dict()).copy()
-        return cls(source, dest, props=props, **data)
-
-    @classmethod
-    def new_from_db(cls, data):
-        data = data.copy()
-        endpoints = []
-        for prefix in ('src_{}', 'dst_'):
-            dpid = data[prefix + 'switch']
-            port = data[prefix + 'port']
-            endpoints.append(NetworkEndpoint(dpid, port))
-        source, dest = endpoints
-        props = data.get('props', dict()).copy()
-        return cls(source, dest, props=props)
-
-    def __init__(self, source, dest, **fields):
-        super(LinkProps, self).__init__(**fields)
-        self.source = source
-        self.dest = dest
-
-        self._filter_props()
-        self._decode_props()
-
-    def _filter_props(self):
-        filtered = set()
-        for field in self.isl_protected_fields:
-            try:
-                del self.props[field]
-                filtered.add(field)
-            except KeyError:
-                pass
-        if filtered:
-            logger.warning(
-                'Filter out %s fields from object %s',
-                ', '.join(repr(x) for x in sorted(filtered)),
-                self)
-
-    def _decode_props(self):
-        for field, converter in self.props_converters.items():
-            try:
-                value = self.props[field]
-            except KeyError:
-                continue
-            self.props[field] = converter(value)
-
-
 class JsonSerializable(object):
     pass
 
@@ -319,11 +319,11 @@ class JsonSerializable(object):
 class JSONEncoder(json.JSONEncoder):
     def default(self, o):
         if isinstance(o, TimeProperty):
-            result = str(o)
+            value = str(o)
         elif isinstance(o, uuid.UUID):
             value = str(o)
         elif isinstance(o, JsonSerializable):
-            result = vars(o)
+            value = vars(o)
         elif isinstance(o, Abstract):
             value = o.pack()
         else:
