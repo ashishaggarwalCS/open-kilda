@@ -53,6 +53,7 @@ MT_NETWORK_TOPOLOGY_CHANGE = (
     "org.openkilda.messaging.info.event.NetworkTopologyChange")
 CD_NETWORK = "org.openkilda.messaging.command.discovery.NetworkCommandData"
 CD_FLOWS_SYNC_REQUEST = 'org.openkilda.messaging.command.FlowsSyncRequest'
+CD_LINK_PROPS_SYNC = 'org.openkilda.messaging.te.request.LinkPropsSync'
 
 FEATURE_SYNC_OFRULES = 'sync_rules_on_activation'
 FEATURE_REROUTE_ON_ISL_DISCOVERY = 'flows_reroute_on_isl_discovery'
@@ -125,7 +126,9 @@ read_config()
 
 
 class MessageItem(object):
-    def __init__(self, **kwargs):
+    def __init__(self, message):
+        self._raw_message = message
+
         self.type = kwargs.get("clazz")
         self.timestamp = model.TimeProperty.new_from_java_timestamp(
                 kwargs.get("timestamp"))
@@ -206,6 +209,10 @@ class MessageItem(object):
 
             elif self.get_message_type() == MT_SYNC_REQUEST:
                 event_handled = self.sync_switch_rules()
+
+            elif self.get_message_type() == CD_LINK_PROPS_SYNC:
+                self.link_props_sync()
+                event_handled = True
 
             if not event_handled:
                 logger.error('Message was not handled correctly: message=%s',
@@ -782,3 +789,18 @@ class MessageItem(object):
             if not value:
                 continue
             self.payload[key] = value.as_java_timestamp()
+
+    def link_props_sync(self):
+        try:
+            command = self.payload['command']
+            linkprops = model.LinkProps.new_from_java(self.payload['link_prop'])
+        except (KeyError, ValueError, TypeError) as e:
+            raise exc.MalformedInputError(self._raw_message, e)
+
+        if command == 'UPDATE':
+            pass
+        elif command == 'DELETE':
+            pass
+        else:
+            raise exc.NotImplementedError(
+                'link props sync command {}'.format(command))

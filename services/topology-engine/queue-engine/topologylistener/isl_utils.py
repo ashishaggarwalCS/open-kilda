@@ -20,6 +20,7 @@ from topologylistener import db
 from topologylistener import exc
 from topologylistener import flow_utils
 from topologylistener import model
+from topologylistener import link_props_utils
 
 logger = logging.getLogger(__name__)
 
@@ -259,7 +260,7 @@ def set_active_field(tx, neo_id, status):
 def set_cost(tx, isl, cost):
     props = {'cost': cost}
     try:
-        changed = set_link_props(tx, isl, props)
+        changed = link_props_utils.set_props(tx, isl, props)
     except exc.DBRecordNotFound:
         changed = set_props(tx, isl, props)
 
@@ -286,66 +287,6 @@ def set_props(tx, isl, props):
     return origin
 
 
-def set_link_props(tx, isl, props):
-    match = _make_match(isl)
-    q = textwrap.dedent("""
-        MATCH (target:link_props {
-            src_switch: $src_switch,
-            src_port: $src_port,
-            dst_switch: $dst_switch,
-            dst_port: $dst_port})
-        RETURN target""")
-
-    logger.debug('link_props lookup query:\n%s', q)
-    cursor = tx.run(q, match)
-
-    try:
-        target = db.fetch_one(cursor)['target']
-    except exc.DBEmptyResponse:
-        raise exc.DBRecordNotFound(q, match)
-
-    origin, update = _locate_changes(target, props)
-    if update:
-        q = textwrap.dedent("""
-        MATCH (target:link_props) 
-        WHERE id(target)=$target_id
-        """) + db.format_set_fields(
-                db.escape_fields(update), field_prefix='target.')
-
-        logger.debug('Push link_props properties: %r', update)
-        tx.run(q, {'target_id': db.neo_id(target)})
-
-        sync_with_link_props(tx, isl, *update.keys())
-
-    return origin
-
-
-def sync_with_link_props(tx, isl, *fields):
-    copy_fields = {
-        name: 'source.' + name for name in fields}
-    q = textwrap.dedent("""
-        MATCH (source:link_props) 
-        WHERE source.src_switch = $src_switch
-          AND source.src_port = $src_port
-          AND source.dst_switch = $dst_switch
-          AND source.dst_port = $dst_port
-        MATCH
-          (:switch {name: $src_switch})
-          -
-          [target:isl {
-            src_switch: $src_switch,
-            src_port: $src_port,
-            dst_switch: $dst_switch,
-            dst_port: $dst_port
-          }]
-          ->
-          (:switch {name: $dst_switch})
-        """) + db.format_set_fields(
-            db.escape_fields(copy_fields, raw_values=True),
-            field_prefix='target.')
-    tx.run(q, _make_match(isl))
-
-
 def _lock_affected_switches(tx, db_links, *extra):
     affected_switches = set(extra)
     for link in db_links:
@@ -353,22 +294,6 @@ def _lock_affected_switches(tx, db_links, *extra):
         affected_switches.add(link['dst_switch'])
 
     flow_utils.precreate_switches(tx, *affected_switches)
-
-
-def _locate_changes(target, props):
-    origin = {}
-    update = {}
-    for field, value in props.items():
-        try:
-            current = target[field]
-        except KeyError:
-            update[field] = props[field]
-        else:
-            if current != props[field]:
-                update[field] = props[field]
-                origin[field] = current
-
-    return origin, update
 
 
 def _make_match(isl):

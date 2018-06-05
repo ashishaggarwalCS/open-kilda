@@ -39,6 +39,22 @@ def log_query(marker, q, p):
     log.debug('NEO4J QUERY %s:\n%s\nparams:\n%s', marker, q, pprint.pformat(p))
 
 
+def locate_changes(target, props):
+    origin = {}
+    update = {}
+    for field, value in props.items():
+        try:
+            current = target[field]
+        except KeyError:
+            update[field] = props[field]
+        else:
+            if current != props[field]:
+                update[field] = props[field]
+                origin[field] = current
+
+    return origin, update
+
+
 def neo_id(db_object):
     return py2neo.remote(db_object)._id
 

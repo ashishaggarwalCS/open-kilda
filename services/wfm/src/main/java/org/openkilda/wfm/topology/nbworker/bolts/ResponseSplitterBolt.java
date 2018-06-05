@@ -18,7 +18,7 @@ package org.openkilda.wfm.topology.nbworker.bolts;
 import org.openkilda.messaging.Message;
 import org.openkilda.messaging.Utils;
 import org.openkilda.messaging.info.InfoData;
-import org.openkilda.messaging.nbtopology.response.ChunkedInfoMessage;
+import org.openkilda.messaging.info.ChunkedInfoMessage;
 import org.openkilda.wfm.AbstractBolt;
 import org.openkilda.wfm.topology.AbstractTopology;
 
